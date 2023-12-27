@@ -33,14 +33,30 @@ def retrieve_data(url):
             #build_year = int(target.get('Build_year', 0)) 
             #floors_num = int(target.get('Building_floors_num', 0))
             #floor_num = target.get('Floor_no') # keep in mind strange formating e.g. ["floor_5"]
-            price = int(target.get('Price', 0))
-            rent = int(target.get('Rent', 0))
+            price = target.get('Price', 0)
+            rent = target.get('Rent', 0)
 
             print(f"ID: {ad_id}")
             #print(f"Description: {ad_description}")
             print(f"Area: {area}")
             print(f"Price: {price}")
             print(f"Rent: {rent}")
+
+            characteristics = ad_data.get('characteristics')
+            market = None # secondary or primary -- wtórny lub pierwotny
+            for c in characteristics:
+                if c.get('key', None) == "market":
+                    market = c.get('value', None)
+                    break
+
+            print(f"Market: {market}")
+            location = ad_data.get('location')
+            coords = location.get('coordinates')
+
+            latitude = coords.get('latitude', 0.0)
+            longitude = coords.get('longitude', 0.0)
+            print(f"Latitude: {latitude}")
+            print(f"Longitude: {longitude}")
 
         except json.JSONDecodeError as e:
             print(f"Error decoding JSON: {e}")
@@ -68,7 +84,7 @@ for page_num in range(1, max_page + 1):
         if link not in visited_listings:
             visited_listings.add(link)
             retrieve_data(BASE_URL + link) 
-            input()
+    input()
 
 #print(len(visited_listings))
 
