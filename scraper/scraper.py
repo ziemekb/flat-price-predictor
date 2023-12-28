@@ -71,8 +71,6 @@ pages_soup = pages_soup.find_all("a", attrs={"data-cy" : re.compile("pagination.
 
 max_page = max(int(page_num.text) for page_num in pages_soup)
 
-#print(max_page)
-
 visited_listings = set()
 
 for page_num in range(1, max_page + 1):
@@ -85,6 +83,3 @@ for page_num in range(1, max_page + 1):
             visited_listings.add(link)
             retrieve_data(BASE_URL + link) 
     input()
-
-#print(len(visited_listings))
-

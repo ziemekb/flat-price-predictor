@@ -10,8 +10,8 @@ def classify_coor(latitude, longitude):
             return row['NAZWAOSIED']
     return None
 
-shp_path = r"wroclaw/GraniceOsiedli.shp"
+shp_path = r"wroclaw/borders.shp"
 wroclaw = geopandas.read_file(shp_path)
 wroclaw = wroclaw.to_crs("EPSG:4326")
 
-print(classify_coor(51.1168551569616, 16.95513647328204))
+#print(classify_coor(51.1168551569616, 16.95513647328204))
