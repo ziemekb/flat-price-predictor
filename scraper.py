@@ -3,7 +3,9 @@ import argparse
 import json
 import requests
 import re
+import csv
 import pandas as pd
+from math import inf
 
 BASE_URL = "https://www.otodom.pl"
 LISTINGS_URL = BASE_URL + "/pl/wyniki/sprzedaz/mieszkanie/dolnoslaskie/wroclaw"
@@ -11,7 +13,7 @@ LISTINGS_URL = BASE_URL + "/pl/wyniki/sprzedaz/mieszkanie/dolnoslaskie/wroclaw"
 PROPERTIES=['area', 'price', 'district', 'rent', 'market', 'garage', 'balcony']
 # returns pandas Series with default columns price, metric area 
 # and parameters specified in args
-def retrieve_data(url):
+def retrieve_listing_data(url, properties):
     listing = requests.get(url)
     listing_soup = BeautifulSoup(listing.content, "html.parser")
     
@@ -68,35 +70,52 @@ def retrieve_data(url):
     else:
         print("Script tag with id='__NEXT_DATA__' not found.")
 
-def scrape_otodom(properties=None, listings_mx=None):
-    page = requests.get(LISTINGS_URL)
+    return None
+
+def get_max_page(listings_url):
+    page = requests.get(listings_url)
     soup = BeautifulSoup(page.content, "html.parser")
 
     pages_soup = soup.find("nav", attrs={"data-cy" : "pagination", "role" : "navigation"})
     pages_soup = pages_soup.find_all("a", attrs={"data-cy" : re.compile("pagination.go-to-page*")})
 
-    max_page = max(int(page_num.text) for page_num in pages_soup)
+    return max(int(page_num.text) for page_num in pages_soup)
 
+
+def scrape_otodom(properties=None, listings_mx=None):
+
+    if not properties:
+        properties=PROPERTIES[:2]
+    else:
+        properties = sorted(properties, key=lambda x: PROPERTIES.index(x))
+    if not listings_mx:
+        listings_mx = inf
+    
     visited_listings = set()
     lcounter = 0
 
-    for page_num in range(1, max_page + 1):
-        page = requests.get(LISTINGS_URL + "?page=" + str(page_num))
-        page_soup = BeautifulSoup(page.content, "html.parser")
-        a_tags = page_soup.find_all("a", href=True, attrs={"data-cy" : "listing-item-link"})
-        for tag in a_tags:
-            link = tag["href"]
-            if link in visited_listings:
-                continue
-            visited_listings.add(link)
-            data = retrieve_data(BASE_URL + link) 
-            '''
-            if data:
+    with open(r"listings.csv", "a", newline="") as csv_file:
+        writer = csv.writer(csv_file, delimiter=",")
+        writer.writerow([p.capitalize() for p in properties])
+        max_page = get_max_page(LISTINGS_URL)
+        for page_num in range(1, max_page + 1):
+            page = requests.get(LISTINGS_URL + "?page=" + str(page_num))
+            page_soup = BeautifulSoup(page.content, "html.parser")
+            a_tags = page_soup.find_all("a", href=True, attrs={"data-cy" : "listing-item-link"})
+            for tag in a_tags:
+                link = tag["href"]
+                if link in visited_listings:
+                    continue
+                visited_listings.add(link)
+                data = retrieve_listing_data(BASE_URL + link, properties) 
+                if not data:
+                    continue
                 lcounter += 1
+                writer.writerow(data)
+                # here write data to csv file
                 if lcounter > listings_mx:
                     return None 
-            '''
-        input()
+            input()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Scrapes otodom website for flat listings")
