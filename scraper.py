@@ -1,11 +1,16 @@
 from bs4 import BeautifulSoup
+import argparse
 import json
 import requests
 import re
+import pandas as pd
 
 BASE_URL = "https://www.otodom.pl"
 LISTINGS_URL = BASE_URL + "/pl/wyniki/sprzedaz/mieszkanie/dolnoslaskie/wroclaw"
 
+PROPERTIES=['area', 'price', 'district', 'rent', 'market', 'garage', 'balcony']
+# returns pandas Series with default columns price, metric area 
+# and parameters specified in args
 def retrieve_data(url):
     listing = requests.get(url)
     listing_soup = BeautifulSoup(listing.content, "html.parser")
@@ -63,23 +68,43 @@ def retrieve_data(url):
     else:
         print("Script tag with id='__NEXT_DATA__' not found.")
 
-page = requests.get(LISTINGS_URL)
-soup = BeautifulSoup(page.content, "html.parser")
+def scrape_otodom(properties=None, listings_mx=None):
+    page = requests.get(LISTINGS_URL)
+    soup = BeautifulSoup(page.content, "html.parser")
 
-pages_soup = soup.find("nav", attrs={"data-cy" : "pagination", "role" : "navigation"})
-pages_soup = pages_soup.find_all("a", attrs={"data-cy" : re.compile("pagination.go-to-page*")})
+    pages_soup = soup.find("nav", attrs={"data-cy" : "pagination", "role" : "navigation"})
+    pages_soup = pages_soup.find_all("a", attrs={"data-cy" : re.compile("pagination.go-to-page*")})
 
-max_page = max(int(page_num.text) for page_num in pages_soup)
+    max_page = max(int(page_num.text) for page_num in pages_soup)
 
-visited_listings = set()
+    visited_listings = set()
+    lcounter = 0
 
-for page_num in range(1, max_page + 1):
-    page = requests.get(LISTINGS_URL + "?page=" + str(page_num))
-    page_soup = BeautifulSoup(page.content, "html.parser")
-    a_tags = page_soup.find_all("a", attrs={"data-cy" : "listing-item-link"})
-    for tag in a_tags:
-        link = tag["href"]
-        if link not in visited_listings:
+    for page_num in range(1, max_page + 1):
+        page = requests.get(LISTINGS_URL + "?page=" + str(page_num))
+        page_soup = BeautifulSoup(page.content, "html.parser")
+        a_tags = page_soup.find_all("a", href=True, attrs={"data-cy" : "listing-item-link"})
+        for tag in a_tags:
+            link = tag["href"]
+            if link in visited_listings:
+                continue
             visited_listings.add(link)
-            retrieve_data(BASE_URL + link) 
-    input()
+            data = retrieve_data(BASE_URL + link) 
+            '''
+            if data:
+                lcounter += 1
+                if lcounter > listings_mx:
+                    return None 
+            '''
+        input()
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Scrapes otodom website for flat listings")
+    parser.add_argument('-p', '--properties', nargs='+', choices=PROPERTIES, 
+                        help='allows choosing which properties to scrape')
+    parser.add_argument('-l', '--listings', type=int,
+                        help='allows specifying how many listing to scrapes')
+    args = parser.parse_args()
+    scrape_otodom(args.properties, args.listings)
+
+
