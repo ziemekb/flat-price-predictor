@@ -12,7 +12,7 @@ BASE_URL = "https://www.otodom.pl"
 LISTINGS_URL = BASE_URL + "/pl/wyniki/sprzedaz/mieszkanie/dolnoslaskie/wroclaw"
 
 # all available properties of properties
-PROPERTIES=['area', 'price', 'rent', 'district', 'latitude', 'longitude', 'market', 'build_year', 'garage', 'lift', 'basement', 'balcony_garden_terrace']
+PROPERTIES=['area', 'price', 'rent', 'district', 'latitude', 'longitude', 'market', 'build_year', 'garage', 'lift', 'basement', 'balcony', 'garden', 'terrace']
 
 def retrieve_listing_data(url, properties):
     listing = requests.get(url)
@@ -42,8 +42,10 @@ def retrieve_listing_data(url, properties):
         target = ad_data.get('target')
         
         props_dict['area'] = float(target.get('Area', None))
-        #props_dict['floors_num'] = int(target.get('Building_floors_num', 0))
-        #props_dict['floor_num'] = target.get('Floor_no') # keep in mind strange formating e.g. ["floor_5"]
+        floors_num = target.get('Building_floors_num', None)
+        props_dict['floors_num'] = int(floors_num) if floors_num is not None else None 
+        #props_dict['floor_num'] = target.get('Floor_no') 
+        # keep in mind strange formating e.g. ["floor_5"]
         props_dict['price'] = target.get('Price', None)
         props_dict['rent'] = target.get('Rent', None)
         
@@ -64,7 +66,7 @@ def retrieve_listing_data(url, properties):
         
         # build year
         build_year = target.get('Build_year', None)
-        props_dict['build_year'] = int(build_year) if build_year != None else None 
+        props_dict['build_year'] = int(build_year) if build_year is not None else None 
 
         # constructions status: "ready_to_use", "to_completion", "to_renovation" or None
         # stan wykończenia odpowiednio: "do zamieszkania", "do wykończenia", "do remontu"
@@ -78,16 +80,9 @@ def retrieve_listing_data(url, properties):
             props_dict['garage']   = True if "garage" in extras else False
             props_dict['lift']     = True if "lift" in extras else False
             props_dict['basement'] = True if "basement" in extras else False
-            props_dict['balcony_garden_terrace'] = []
-            if "balcony" in extras:
-                props_dict['balcony_garden_terrace'].append("balcony")
-            if "garden" in extras:
-                props_dict['balcony_garden_terrace'].append("garden")
-            if "terrace" in extras:
-                props_dict['balcony_garden_terrace'].append("terrace")
-            if not props_dict['balcony_garden_terrace']:
-                props_dict['balcony_garden_terrace'] = None
-
+            props_dict['balcony']  = True if "balcony" in extras else False
+            props_dict['garden']   = True if "garden" in extras else False
+            props_dict['terrace']  = True if "terrace" in extras else False
 
         print(f"ID: {ad_id}")
         #print(f"Description: {ad_description}")
@@ -98,8 +93,9 @@ def retrieve_listing_data(url, properties):
         print(f"District: {props_dict['district']}")
         print(f"Rent: {props_dict['rent']}")
         print(f"Market: {props_dict['market']}")
-        input()
         
+        if(props_dict['area'] is None or props_dict['price'] is None):
+            return None
         data = [props_dict[p] for p in properties]
 
         #return data if all(data) else None
