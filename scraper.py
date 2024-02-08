@@ -12,7 +12,7 @@ BASE_URL = "https://www.otodom.pl"
 LISTINGS_URL = BASE_URL + "/pl/wyniki/sprzedaz/mieszkanie/dolnoslaskie/wroclaw"
 
 # all available properties of properties
-PROPERTIES=['area', 'price', 'rent', 'district', 'latitude', 'longitude', 'market', 'build_year', 'garage', 'lift', 'basement', 'balcony', 'garden', 'terrace']
+PROPERTIES=['area', 'price', 'rent', 'district', 'latitude', 'longitude', 'market', 'build_year', 'garage', 'lift', 'basement', 'balcony', 'garden', 'terrace', 'floors_num', 'floor_no']
 
 def retrieve_listing_data(url, properties):
     listing = requests.get(url)
@@ -44,7 +44,21 @@ def retrieve_listing_data(url, properties):
         props_dict['area'] = float(target.get('Area', None))
         floors_num = target.get('Building_floors_num', None)
         props_dict['floors_num'] = int(floors_num) if floors_num is not None else None 
-        #props_dict['floor_num'] = target.get('Floor_no') 
+        floor_str = target.get('Floor_no')[0]
+        floor_no = None
+        if floor_str == "ground_floor":
+            floor_no = 0
+        elif floor_str == "floor_higher_10":
+            floor_no = 11
+        else:
+            prefix = "floor_"
+            if floor_str.startswith(prefix):
+                try:
+                    floor_no = int(floor_str[len(prefix):])
+                except ValueError:
+                    return None
+
+        props_dict['floor_no'] = floor_no
         # keep in mind strange formating e.g. ["floor_5"]
         props_dict['price'] = target.get('Price', None)
         props_dict['rent'] = target.get('Rent', None)
@@ -100,6 +114,8 @@ def retrieve_listing_data(url, properties):
         print(f"District: {props_dict['district']}")
         print(f"Rent: {props_dict['rent']}")
         print(f"Market: {props_dict['market']}")
+        print(f"Floors number: {props_dict['floors_num']}")
+        print(f"Floor number: {props_dict['floor_no']}")
         
         if(props_dict['area'] is None or props_dict['price'] is None):
             return None
