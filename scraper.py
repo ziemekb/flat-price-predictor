@@ -50,6 +50,13 @@ def retrieve_listing_data(url, properties):
         props_dict['rent'] = target.get('Rent', None)
         
         location = ad_data.get('location')
+
+        # if the location is not accurate, reject the listing
+        mapDetails = location.get('mapDetails')
+        isInexact = mapDetails.get('radius', -1)
+        if(isInexact != 0):
+            return None
+
         coords = location.get('coordinates')
 
         latitude = coords.get('latitude', None)
