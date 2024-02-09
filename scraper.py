@@ -12,7 +12,8 @@ BASE_URL = "https://www.otodom.pl"
 LISTINGS_URL = BASE_URL + "/pl/wyniki/sprzedaz/mieszkanie/dolnoslaskie/wroclaw"
 
 # all available properties of properties
-PROPERTIES=['area', 'price', 'rent', 'district', 'latitude', 'longitude', 'market', 'build_year', 'garage', 'lift', 'basement', 'balcony', 'garden', 'terrace', 'floors_num', 'floor_no']
+PROPERTIES=['area', 'price', 'market', 'rooms_num', 'rent', 'district', 'build_year', 'garage', 'lift', 'basement', 'balcony', 'garden', 'terrace', 'floors_num', 'floor_no', 'latitude', 'longitude', 'construction_status']
+CSV_FILE_NAME = "temp.csv"
 
 def retrieve_listing_data(url, properties):
     listing = requests.get(url)
@@ -41,11 +42,23 @@ def retrieve_listing_data(url, properties):
         # extract 'target'; fields which interest us the most
         target = ad_data.get('target')
         
-        props_dict['area'] = float(target.get('Area', None))
+        props_dict['price'] = target.get('Price', None)
+        area = target.get('Area', None)
+        props_dict['area'] = float(area) if area is not None else None
+
+        # number of rooms
+        rooms_num = target.get('Rooms_num', None)
+        props_dict['rooms_num'] = int(rooms_num[0]) if rooms_num is not None else None
+
+        # number of floors in the building
         floors_num = target.get('Building_floors_num', None)
         props_dict['floors_num'] = int(floors_num) if floors_num is not None else None 
-        floor_str = target.get('Floor_no')[0]
+
+        # scraping floor number from descriptive, not numerical field 
+        floor_str = target.get('Floor_no', None)
+        floor_str = floor_str[0] if floor_str is not None else None
         floor_no = None
+
         if floor_str == "ground_floor":
             floor_no = 0
         elif floor_str == "floor_higher_10":
@@ -59,8 +72,6 @@ def retrieve_listing_data(url, properties):
                     return None
 
         props_dict['floor_no'] = floor_no
-        # keep in mind strange formating e.g. ["floor_5"]
-        props_dict['price'] = target.get('Price', None)
         props_dict['rent'] = target.get('Rent', None)
         
         location = ad_data.get('location')
@@ -68,8 +79,6 @@ def retrieve_listing_data(url, properties):
         # if the location is not accurate, reject the listing
         mapDetails = location.get('mapDetails')
         isInexact = mapDetails.get('radius', -1)
-        if(isInexact != 0):
-            return None
 
         coords = location.get('coordinates')
 
@@ -92,10 +101,9 @@ def retrieve_listing_data(url, properties):
         # constructions status: "ready_to_use", "to_completion", "to_renovation" or None
         # stan wykończenia odpowiednio: "do zamieszkania", "do wykończenia", "do remontu"
         construction_status = target.get('Construction_status', None)
-        if construction_status:
-            props_dict['construction_status'] = construction_status[0]
+        props_dict['construction_status'] = construction_status[0] if construction_status is not None else None
 
-        # informacje dodatkowe
+        # additional information 
         extras = target.get('Extras_types', None)
         if extras:
             props_dict['garage']   = True if "garage" in extras else False
@@ -116,12 +124,14 @@ def retrieve_listing_data(url, properties):
         print(f"Market: {props_dict['market']}")
         print(f"Floors number: {props_dict['floors_num']}")
         print(f"Floor number: {props_dict['floor_no']}")
-        
-        if(props_dict['area'] is None or props_dict['price'] is None):
+
+        if isInexact != 0:
+            return None
+        if(props_dict['area'] is None or props_dict['price'] is None or 
+           props_dict['market'] is None or props_dict['rooms_num'] is None):
             return None
         data = [props_dict[p] for p in properties]
 
-        #return data if all(data) else None
         return data
     except AttributeError as e:
         print(f"error when scraping JSON {e}")
@@ -151,7 +161,7 @@ def scrape_otodom(properties=None, listings_mx=None):
     visited_listings = set()
     lcounter = 0
 
-    with open(r"listings.csv", "w", newline="") as csv_file:
+    with open(CSV_FILE_NAME, "w", newline="") as csv_file:
         writer = csv.writer(csv_file, delimiter=";")
         writer.writerow([p.capitalize() for p in properties])
         max_page = get_max_page(LISTINGS_URL)
@@ -172,6 +182,8 @@ def scrape_otodom(properties=None, listings_mx=None):
                 if lcounter >= listings_mx:
                     print("Reached the given limit")
                     return None 
+                if lcounter % 100 == 0:
+                    print(f"Number of listings acquired: {lcounter}")
         print("Reached the end of the listings")
 
 if __name__ == '__main__':
