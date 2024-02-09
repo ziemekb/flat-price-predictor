@@ -4,6 +4,8 @@ import json
 import requests
 import re
 import csv
+import random
+from time import sleep
 import pandas as pd
 from math import inf
 from geoposition import classify_coords
@@ -12,7 +14,7 @@ BASE_URL = "https://www.otodom.pl"
 LISTINGS_URL = BASE_URL + "/pl/wyniki/sprzedaz/mieszkanie/dolnoslaskie/wroclaw"
 
 # all available properties of properties
-PROPERTIES=['area', 'price', 'market', 'rooms_num', 'rent', 'district', 'build_year', 'garage', 'lift', 'basement', 'balcony', 'garden', 'terrace', 'floors_num', 'floor_no', 'latitude', 'longitude', 'construction_status']
+PROPERTIES=['area', 'price', 'market', 'rooms_num', 'rent', 'district', 'build_year', 'garage', 'lift', 'basement', 'balcony', 'garden', 'terrace', 'floors_num', 'floor_no', 'construction_status', 'latitude', 'longitude']
 CSV_FILE_NAME = "temp.csv"
 
 def retrieve_listing_data(url, properties):
@@ -113,6 +115,7 @@ def retrieve_listing_data(url, properties):
             props_dict['garden']   = True if "garden" in extras else False
             props_dict['terrace']  = True if "terrace" in extras else False
 
+        '''
         print(f"ID: {ad_id}")
         #print(f"Description: {ad_description}")
         print(f"Area: {props_dict['area']}")
@@ -124,6 +127,7 @@ def retrieve_listing_data(url, properties):
         print(f"Market: {props_dict['market']}")
         print(f"Floors number: {props_dict['floors_num']}")
         print(f"Floor number: {props_dict['floor_no']}")
+        '''
 
         if isInexact != 0:
             return None
@@ -170,6 +174,9 @@ def scrape_otodom(properties=None, listings_mx=None):
             page_soup = BeautifulSoup(page.content, "html.parser")
             a_tags = page_soup.find_all("a", href=True, attrs={"data-cy" : "listing-item-link"})
             for tag in a_tags:
+                sleeptime = random.uniform(1, 2)
+                sleep(sleeptime)
+
                 link = tag["href"]
                 if link in visited_listings:
                     continue
