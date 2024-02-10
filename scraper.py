@@ -14,9 +14,10 @@ BASE_URL = "https://www.otodom.pl"
 LISTINGS_URL = BASE_URL + "/pl/wyniki/sprzedaz/mieszkanie/dolnoslaskie/wroclaw"
 
 # all available properties of properties
-PROPERTIES=['area', 'price', 'market', 'rooms_num', 'rent', 'district', 'build_year', 'garage', 'lift', 'basement', 'balcony', 'garden', 'terrace', 'floors_num', 'floor_no', 'construction_status', 'latitude', 'longitude']
+PROPERTIES=['area', 'price', 'market', 'rooms_num', 'rent', 'district', 'build_year', 'garage', 'lift', 'basement', 'balcony', 'garden', 'terrace', 'floors_num', 'floor_no', 'construction_status', 'latitude', 'longitude', 'link']
 CSV_FILE_NAME = "temp.csv"
 
+# properties are already sorted in the order of PROPERTIES
 def retrieve_listing_data(url, properties):
     listing = requests.get(url)
     listing_soup = BeautifulSoup(listing.content, "html.parser")
@@ -26,10 +27,12 @@ def retrieve_listing_data(url, properties):
 
     if not json_data:
         print("Script tag with id='__NEXT_DATA__' not found.")
+        print(f"URL: {url}")
         return None
 
     try:
         props_dict = {p: None for p in properties}
+        props_dict['link'] = url
 
         data = json.loads(json_data)
         props = data.get('props', {})
@@ -61,7 +64,9 @@ def retrieve_listing_data(url, properties):
         floor_str = floor_str[0] if floor_str is not None else None
         floor_no = None
 
-        if floor_str == "ground_floor":
+        if floor_str is None:
+            floor_no = None
+        elif floor_str == "ground_floor":
             floor_no = 0
         elif floor_str == "floor_higher_10":
             floor_no = 11
@@ -139,6 +144,7 @@ def retrieve_listing_data(url, properties):
         return data
     except AttributeError as e:
         print(f"error when scraping JSON {e}")
+        print(f"URL: {url}")
         return None
 
     return None
@@ -153,38 +159,46 @@ def get_max_page(listings_url):
     return max(int(page_num.text) for page_num in pages_soup)
 
 
-def scrape_otodom(properties=None, listings_mx=None):
+def scrape_otodom(listings_mx=None, properties=None, filename=None):
 
-    if not properties:
-        properties=PROPERTIES
-    else:
-        properties = sorted(properties, key=lambda x: PROPERTIES.index(x))
+    filename = filename or CSV_FILE_NAME
+    visited_listings = set()
+    isValid = False
+    try:
+        df = pd.read_csv(filename, delimiter=';')
+        visited_listings = set(df['Link'])
+        properties = list(col.lower() for col in df.columns.values)
+        isValid = True
+    except FileNotFoundError:
+        print("The file does not exist.")
+
+    properties = sorted(properties, key=lambda x: PROPERTIES.index(x)) if properties else PROPERTIES
+
     if not listings_mx:
         listings_mx = inf
     
-    visited_listings = set()
     lcounter = 0
 
-    with open(CSV_FILE_NAME, "w", newline="") as csv_file:
+    with open(filename, "a", newline="") as csv_file:
         writer = csv.writer(csv_file, delimiter=";")
-        writer.writerow([p.capitalize() for p in properties])
+        writer.writerow([p.capitalize() for p in properties]) if not isValid else None
         max_page = get_max_page(LISTINGS_URL)
         for page_num in range(1, max_page + 1):
             page = requests.get(LISTINGS_URL + "?page=" + str(page_num))
             page_soup = BeautifulSoup(page.content, "html.parser")
             a_tags = page_soup.find_all("a", href=True, attrs={"data-cy" : "listing-item-link"})
             for tag in a_tags:
-                sleeptime = random.uniform(1, 2)
-                sleep(sleeptime)
-
                 link = tag["href"]
                 if link in visited_listings:
                     continue
                 visited_listings.add(link)
+                sleeptime = random.uniform(1, 2)
+                sleep(sleeptime)
                 data = retrieve_listing_data(BASE_URL + link, properties) 
                 if not data:
                     continue
                 lcounter += 1
+                print(f"Listing number: {lcounter}")
                 writer.writerow(data)
                 if lcounter >= listings_mx:
                     print("Reached the given limit")
@@ -195,9 +209,12 @@ def scrape_otodom(properties=None, listings_mx=None):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Scrapes otodom website for flat listings")
-    parser.add_argument('-p', '--properties', nargs='+', choices=PROPERTIES, 
-                        help='allows choosing which properties to scrape')
     parser.add_argument('-l', '--listings', type=int, metavar = 'n',
                         help='allows specifying how many listing to scrapes')
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument('-p', '--properties', nargs='+', choices=PROPERTIES, 
+                        help='allows choosing which properties to scrape')
+    group.add_argument('-f', '--file', type=str, metavar = 'filename',
+                        help='allows specifying the filename to load the data from')
     args = parser.parse_args()
-    scrape_otodom(args.properties, args.listings)
+    scrape_otodom(args.listings, args.properties, args.file)
