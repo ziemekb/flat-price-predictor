@@ -150,7 +150,7 @@ def retrieve_listing_data(url, properties):
     return None
 
 def get_max_page(listings_url):
-    page = requests.get(listings_url)
+    page = requests.get(listings_url, headers={'User-Agent': 'Mozilla/5.0'})
     soup = BeautifulSoup(page.content, "html.parser")
 
     pages_soup = soup.find("nav", attrs={"data-cy" : "pagination", "role" : "navigation"})
