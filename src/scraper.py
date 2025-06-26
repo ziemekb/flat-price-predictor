@@ -17,9 +17,19 @@ LISTINGS_URL = BASE_URL + "/pl/wyniki/sprzedaz/mieszkanie/dolnoslaskie/wroclaw"
 PROPERTIES=['area', 'price', 'market', 'rooms_num', 'rent', 'district', 'build_year', 'garage', 'lift', 'basement', 'balcony', 'garden', 'terrace', 'floors_num', 'floor_no', 'construction_status', 'latitude', 'longitude', 'link']
 CSV_FILE_NAME = "temp.csv"
 
+headers = {
+    "User-Agent": (
+        "Mozilla/5.0 (X11; Linux x86_64; rv:139.0) Gecko/20100101 Firefox/139.0"
+    ),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.5"
+}
+session = requests.Session()
+session.headers.update(headers)
+
 # properties are already sorted in the order of PROPERTIES
 def retrieve_listing_data(url, properties):
-    listing = requests.get(url)
+    listing = session.get(url, headers=headers)
     listing_soup = BeautifulSoup(listing.content, "html.parser")
     
     script_tag = listing_soup.find('script', {'id': '__NEXT_DATA__'})
@@ -150,14 +160,16 @@ def retrieve_listing_data(url, properties):
     return None
 
 def get_max_page(listings_url):
-    page = requests.get(listings_url)
+    page = session.get(listings_url, headers=headers)
     soup = BeautifulSoup(page.content, "html.parser")
+    
+    script = soup.find("script", {"id": "__NEXT_DATA__"})
+    if not script:
+        raise RuntimeError("Couldn’t find __NEXT_DATA__ script tag")
+    data = json.loads(script.string)
+    pagination = data['props']['pageProps']['data']['searchAds']['pagination']
 
-    pages_soup = soup.find("nav", attrs={"data-cy" : "pagination", "role" : "navigation"})
-    pages_soup = pages_soup.find_all("a", attrs={"data-cy" : re.compile("pagination.go-to-page*")})
-
-    return max(int(page_num.text) for page_num in pages_soup)
-
+    return pagination["totalPages"]
 
 def scrape_otodom(listings_mx=None, properties=None, filename=None):
 
@@ -183,8 +195,9 @@ def scrape_otodom(listings_mx=None, properties=None, filename=None):
         writer = csv.writer(csv_file, delimiter=";")
         writer.writerow([p.capitalize() for p in properties]) if not isValid else None
         max_page = get_max_page(LISTINGS_URL)
+        print("Total pages: ", max_page)
         for page_num in range(1, max_page + 1):
-            page = requests.get(LISTINGS_URL + "?page=" + str(page_num))
+            page = session.get(LISTINGS_URL + "?page=" + str(page_num))
             page_soup = BeautifulSoup(page.content, "html.parser")
             a_tags = page_soup.find_all("a", href=True, attrs={"data-cy" : "listing-item-link"})
             for tag in a_tags:
