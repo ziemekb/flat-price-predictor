@@ -223,11 +223,8 @@ def scrape_otodom(listings_mx=None, properties=None, filename=None):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Scrapes otodom website for flat listings")
     parser.add_argument('-l', '--listings', type=int, metavar = 'n',
-                        help='allows specifying how many listing to scrapes')
-    group = parser.add_mutually_exclusive_group()
-    group.add_argument('-p', '--properties', nargs='+', choices=PROPERTIES, 
-                        help='allows choosing which properties to scrape')
-    group.add_argument('-f', '--file', type=str, metavar = 'filename',
-                        help='allows specifying the filename to load the data from')
+                        help='allows specifying how many listing to scrape')
+    parser.add_argument('-f', '--file', type=str, metavar = 'filename',
+                        help='allows specifying filename; can be used to resume scraping')
     args = parser.parse_args()
-    scrape_otodom(args.listings, args.properties, args.file)
+    scrape_otodom(args.listings, PROPERTIES, args.file)
